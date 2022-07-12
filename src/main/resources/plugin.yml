@@ -1,0 +1,10 @@
+name: CVMobCap
+main: org.cubeville.cvmobcap.CVMobCap
+authors: [FrediW, Ptown16]
+version: 1.18
+api-version: 1.18
+
+commands:
+  mobcap:
+    description: Counts mobs in your area
+    permission: cvmobcap.query

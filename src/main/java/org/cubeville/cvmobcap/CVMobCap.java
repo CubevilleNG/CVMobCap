@@ -1,23 +1,21 @@
 package org.cubeville.cvmobcap;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
-import org.bukkit.entity.Dolphin;
-import org.bukkit.entity.Entity;
-import org.bukkit.entity.EntityType;
-import org.bukkit.entity.LivingEntity;
-import org.bukkit.entity.Player;
-import org.bukkit.entity.Squid;
-import org.bukkit.entity.Cod;
+import org.bukkit.entity.*;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.CreatureSpawnEvent;
+import org.bukkit.event.entity.EntityTransformEvent;
+import org.bukkit.event.player.PlayerBucketEmptyEvent;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -81,8 +79,7 @@ public class CVMobCap extends JavaPlugin implements Listener
     public void onEntitySpawn(CreatureSpawnEvent event) {
         if(event.isCancelled()) return;
         
-        LivingEntity le = (LivingEntity) event.getEntity();
-        System.out.println("Spawn living entity: " + le + " cause " + event.getSpawnReason());
+        LivingEntity le = event.getEntity();
         
         if(le.getType() == EntityType.PLAYER || le.getType() == EntityType.ARMOR_STAND || le.getType() == EntityType.MARKER) return;
         
@@ -118,23 +115,94 @@ public class CVMobCap extends JavaPlugin implements Listener
         //         return;
         //     }
         // }
-        
-        if(event.getEntity() instanceof LivingEntity) {
-            int cnt = 0;
-            for(Entity e: event.getEntity().getLocation().getWorld().getEntitiesByClass(LivingEntity.class)) {
-                if(e.getType() != EntityType.PLAYER &&
-                   e.getType() != EntityType.ARMOR_STAND &&
-                   e.getType() != EntityType.MARKER &&
-                   e.getLocation().distance(le.getLocation()) < localMobcapRadius) {
-                    cnt++;
+        String status;
+        int cnt = countMobs(le);
+        if(cnt >= localMobcapCount || (cnt >= localHostileMobcapCount && isMobHostile(le.getType()))) {
+            event.setCancelled(true);
+            status = "TRUE";
+        } else {
+            status = "FALSE";
+        }
+        Bukkit.getConsoleSender().sendMessage("[CVMobCap] Spawning Living Entity: §6" + le.getType() +
+                " §rCause: §6" + event.getSpawnReason() +
+                " §rCancelled: §6" + status);
+    }
+
+    @EventHandler
+    public void onBucketEntitySpawnAttempt(PlayerBucketEmptyEvent event) {
+        if(event.isCancelled()) return;
+        Material mat = event.getBucket();
+        if(!mat.equals(Material.AXOLOTL_BUCKET) &&
+                !mat.equals(Material.PUFFERFISH_BUCKET) &&
+                !mat.equals(Material.SALMON_BUCKET) &&
+                !mat.equals(Material.COD_BUCKET) &&
+                !mat.equals(Material.TROPICAL_FISH_BUCKET)) return;
+        Player player = event.getPlayer();
+        PlayerInventory inv = player.getInventory();
+        ItemStack bucket;
+        if(inv.getItemInMainHand().getType().equals(mat)) {
+            bucket = inv.getItemInMainHand();
+        } else {
+            bucket = inv.getItemInOffHand();
+        }
+        Location location = event.getBlock().getLocation();
+        int initial = countBucketEntities(location);
+        this.getServer().getScheduler().runTaskLater(this, () -> {
+            if(initial >= countBucketEntities(location)) {
+                if(inv.getItemInMainHand().equals(event.getItemStack())) {
+                    inv.setItemInMainHand(null);
+                } else if(inv.getItemInOffHand().equals(event.getItemStack())) {
+                    inv.setItemInOffHand(null);
+                }
+                inv.addItem(new ItemStack(bucket));
+                if(location.getBlock().getType().equals(Material.WATER)) {
+                    location.getBlock().setType(Material.AIR);
                 }
             }
-            if(cnt >= localMobcapCount || (cnt >= localHostileMobcapCount && isMobHostile(le.getType()))) {
-                event.setCancelled(true);
-            }
-            return;
+        }, 1);
+    }
+
+    @EventHandler
+    public void onEntityTransform(EntityTransformEvent event) {
+        Entity le = event.getEntity();
+        String status;
+        int cnt = countMobs(le);
+        if(cnt >= localMobcapCount || (cnt >= localHostileMobcapCount && isMobHostile(le.getType()))) {
+            event.setCancelled(true);
+            status = "TRUE";
+        } else {
+            status = "FALSE";
         }
-                
+        Bukkit.getConsoleSender().sendMessage("[CVMobCap] Transforming Living Entity: §6" + le.getType() +
+                " §rCause: §6" + event.getTransformReason() +
+                " §rCancelled: §6" + status);
+    }
+
+    private int countMobs(Entity le) {
+        int cnt = 0;
+        for(Entity e: le.getLocation().getWorld().getEntitiesByClass(LivingEntity.class)) {
+            if(e.getType() != EntityType.PLAYER &&
+                    e.getType() != EntityType.ARMOR_STAND &&
+                    e.getType() != EntityType.MARKER &&
+                    e.getLocation().distance(le.getLocation()) < localMobcapRadius) {
+                cnt++;
+            }
+        }
+        return cnt;
+    }
+
+    private int countBucketEntities(Location loc) {
+        int i = 0;
+        for(Entity entity : loc.getWorld().getNearbyEntities(loc, 0.5, 0.5, 0.5)) {
+            if(entity instanceof Axolotl ||
+                    entity instanceof PufferFish ||
+                    entity instanceof Salmon ||
+                    entity instanceof  Cod ||
+                    entity instanceof TropicalFish) {
+                i++;
+            }
+        }
+        return i;
     }
 
     private boolean isMobHostile(EntityType type) {

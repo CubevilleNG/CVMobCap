@@ -138,19 +138,30 @@ public class CVMobCap extends JavaPlugin implements Listener
     @EventHandler
     public void onBucketEntitySpawnAttempt(PlayerBucketEmptyEvent event) {
         if(event.isCancelled()) return;
-        if(!event.getBucket().equals(Material.AXOLOTL_BUCKET) &&
-                !event.getBucket().equals(Material.PUFFERFISH_BUCKET) &&
-                !event.getBucket().equals(Material.SALMON_BUCKET) &&
-                !event.getBucket().equals(Material.COD_BUCKET) &&
-                !event.getBucket().equals(Material.TROPICAL_FISH_BUCKET)) return;
+        Material mat = event.getBucket();
+        if(!mat.equals(Material.AXOLOTL_BUCKET) &&
+                !mat.equals(Material.PUFFERFISH_BUCKET) &&
+                !mat.equals(Material.SALMON_BUCKET) &&
+                !mat.equals(Material.COD_BUCKET) &&
+                !mat.equals(Material.TROPICAL_FISH_BUCKET)) return;
         Player player = event.getPlayer();
+        PlayerInventory inv = player.getInventory();
+        ItemStack bucket;
+        if(inv.getItemInMainHand().getType().equals(mat)) {
+            bucket = inv.getItemInMainHand();
+        } else {
+            bucket = inv.getItemInOffHand();
+        }
         Location location = event.getBlock().getLocation();
         int initial = countBucketEntities(location);
         this.getServer().getScheduler().runTaskLater(this, () -> {
             if(initial >= countBucketEntities(location)) {
-                PlayerInventory inv = player.getInventory();
-                inv.remove(Objects.requireNonNull(event.getItemStack()));
-                inv.addItem(new ItemStack(event.getBucket()));
+                if(inv.getItemInMainHand().equals(event.getItemStack())) {
+                    inv.setItemInMainHand(null);
+                } else if(inv.getItemInOffHand().equals(event.getItemStack())) {
+                    inv.setItemInOffHand(null);
+                }
+                inv.addItem(new ItemStack(bucket));
                 if(location.getBlock().getType().equals(Material.WATER)) {
                     location.getBlock().setType(Material.AIR);
                 }

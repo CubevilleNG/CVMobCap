@@ -1,19 +1,12 @@
 package org.cubeville.cvmobcap;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
-import org.bukkit.entity.Dolphin;
-import org.bukkit.entity.Entity;
-import org.bukkit.entity.EntityType;
-import org.bukkit.entity.LivingEntity;
-import org.bukkit.entity.Player;
-import org.bukkit.entity.Squid;
-import org.bukkit.entity.Cod;
+import org.bukkit.entity.*;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -82,7 +75,7 @@ public class CVMobCap extends JavaPlugin implements Listener
         if(event.isCancelled()) return;
         
         LivingEntity le = (LivingEntity) event.getEntity();
-        System.out.println("Spawn living entity: " + le + " cause " + event.getSpawnReason());
+        //Bukkit.getConsoleSender().sendMessage("Spawn living entity: " + le.getType() + " cause " + event.getSpawnReason());
         
         if(le.getType() == EntityType.PLAYER || le.getType() == EntityType.ARMOR_STAND || le.getType() == EntityType.MARKER) return;
         
@@ -118,24 +111,43 @@ public class CVMobCap extends JavaPlugin implements Listener
         //         return;
         //     }
         // }
-        
-        if(event.getEntity() instanceof LivingEntity) {
-            int cnt = 0;
-            for(Entity e: event.getEntity().getLocation().getWorld().getEntitiesByClass(LivingEntity.class)) {
-                if(e.getType() != EntityType.PLAYER &&
-                   e.getType() != EntityType.ARMOR_STAND &&
-                   e.getType() != EntityType.MARKER &&
-                   e.getLocation().distance(le.getLocation()) < localMobcapRadius) {
-                    cnt++;
-                }
+        String status;
+        int cnt = 0;
+        for(Entity e: event.getEntity().getLocation().getWorld().getEntitiesByClass(LivingEntity.class)) {
+            if(e.getType() != EntityType.PLAYER &&
+                    e.getType() != EntityType.ARMOR_STAND &&
+                    e.getType() != EntityType.MARKER &&
+                    e.getLocation().distance(le.getLocation()) < localMobcapRadius) {
+                cnt++;
             }
-            if(cnt >= localMobcapCount || (cnt >= localHostileMobcapCount && isMobHostile(le.getType()))) {
-                event.setCancelled(true);
-            }
-            return;
         }
-                
+        if(cnt >= localMobcapCount || (cnt >= localHostileMobcapCount && isMobHostile(le.getType()))) {
+            event.setCancelled(true);
+            status = "TRUE";
+        } else {
+            status = "FALSE";
+        }
+        Bukkit.getConsoleSender().sendMessage("[CVMobCap] Spawning Living Entity: §6" + le.getType() + " §rCause: §6" + event.getSpawnReason() + " §rCancelled: §6" + status);
     }
+
+    /*@EventHandler
+    public void onAxolotlSpawnAttempt(PlayerBucketEmptyEvent event) {
+        //if(event.getAction() != Action.RIGHT_CLICK_BLOCK || event.getClickedBlock() == null) return;
+        //if(Objects.equals(event.getHand(), EquipmentSlot.OFF_HAND)) return;
+        Player player = event.getPlayer();
+        //if(!player.getInventory().getItemInMainHand().getType().equals(Material.AXOLOTL_BUCKET)) return;
+        for(Entity entity : player.getWorld().getNearbyEntities(player.getLocation(), 5, 5, 5)) {
+            if(entity instanceof Axolotl) {
+                if(entity.getLocation().equals(player.getEyeLocation())) {
+                    System.out.println("Axolotl spawned!");
+                    return;
+                }
+                System.out.println("EntityLoc: " + entity.getLocation());
+                System.out.println("EyeLoc: " + player.getEyeLocation());
+            }
+        }
+        System.out.println("Axolotl not spawned! Shame!");
+    }*/
 
     private boolean isMobHostile(EntityType type) {
         for(EntityType t: hostileMobs) {

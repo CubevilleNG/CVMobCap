@@ -136,7 +136,7 @@ public class CVMobCap extends JavaPlugin implements Listener
     }
 
     @EventHandler
-    public void onAxolotlSpawnAttempt(PlayerBucketEmptyEvent event) {
+    public void onBucketEntitySpawnAttempt(PlayerBucketEmptyEvent event) {
         if(event.isCancelled()) return;
         if(!event.getBucket().equals(Material.AXOLOTL_BUCKET) &&
                 !event.getBucket().equals(Material.PUFFERFISH_BUCKET) &&

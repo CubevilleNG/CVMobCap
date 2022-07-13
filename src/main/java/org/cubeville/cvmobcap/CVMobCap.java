@@ -12,6 +12,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.CreatureSpawnEvent;
+import org.bukkit.event.entity.EntityTransformEvent;
 import org.bukkit.event.player.PlayerBucketEmptyEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
@@ -115,15 +116,7 @@ public class CVMobCap extends JavaPlugin implements Listener
         //     }
         // }
         String status;
-        int cnt = 0;
-        for(Entity e: event.getEntity().getLocation().getWorld().getEntitiesByClass(LivingEntity.class)) {
-            if(e.getType() != EntityType.PLAYER &&
-                    e.getType() != EntityType.ARMOR_STAND &&
-                    e.getType() != EntityType.MARKER &&
-                    e.getLocation().distance(le.getLocation()) < localMobcapRadius) {
-                cnt++;
-            }
-        }
+        int cnt = countMobs(le);
         if(cnt >= localMobcapCount || (cnt >= localHostileMobcapCount && isMobHostile(le.getType()))) {
             event.setCancelled(true);
             status = "TRUE";
@@ -169,7 +162,36 @@ public class CVMobCap extends JavaPlugin implements Listener
         }, 1);
     }
 
-    private Integer countBucketEntities(Location loc) {
+    @EventHandler
+    public void onEntityTransform(EntityTransformEvent event) {
+        Entity le = event.getEntity();
+        String status;
+        int cnt = countMobs(le);
+        if(cnt >= localMobcapCount || (cnt >= localHostileMobcapCount && isMobHostile(le.getType()))) {
+            event.setCancelled(true);
+            status = "TRUE";
+        } else {
+            status = "FALSE";
+        }
+        Bukkit.getConsoleSender().sendMessage("[CVMobCap] Transforming Living Entity: §6" + le.getType() +
+                " §rCause: §6" + event.getTransformReason() +
+                " §rCancelled: §6" + status);
+    }
+
+    private int countMobs(Entity le) {
+        int cnt = 0;
+        for(Entity e: le.getLocation().getWorld().getEntitiesByClass(LivingEntity.class)) {
+            if(e.getType() != EntityType.PLAYER &&
+                    e.getType() != EntityType.ARMOR_STAND &&
+                    e.getType() != EntityType.MARKER &&
+                    e.getLocation().distance(le.getLocation()) < localMobcapRadius) {
+                cnt++;
+            }
+        }
+        return cnt;
+    }
+
+    private int countBucketEntities(Location loc) {
         int i = 0;
         for(Entity entity : loc.getWorld().getNearbyEntities(loc, 0.5, 0.5, 0.5)) {
             if(entity instanceof Axolotl ||

@@ -4,6 +4,7 @@ import java.util.*;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.*;
@@ -11,6 +12,9 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.CreatureSpawnEvent;
+import org.bukkit.event.player.PlayerBucketEmptyEvent;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.PlayerInventory;
 import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -74,8 +78,7 @@ public class CVMobCap extends JavaPlugin implements Listener
     public void onEntitySpawn(CreatureSpawnEvent event) {
         if(event.isCancelled()) return;
         
-        LivingEntity le = (LivingEntity) event.getEntity();
-        //Bukkit.getConsoleSender().sendMessage("Spawn living entity: " + le.getType() + " cause " + event.getSpawnReason());
+        LivingEntity le = event.getEntity();
         
         if(le.getType() == EntityType.PLAYER || le.getType() == EntityType.ARMOR_STAND || le.getType() == EntityType.MARKER) return;
         
@@ -127,27 +130,47 @@ public class CVMobCap extends JavaPlugin implements Listener
         } else {
             status = "FALSE";
         }
-        Bukkit.getConsoleSender().sendMessage("[CVMobCap] Spawning Living Entity: §6" + le.getType() + " §rCause: §6" + event.getSpawnReason() + " §rCancelled: §6" + status);
+        Bukkit.getConsoleSender().sendMessage("[CVMobCap] Spawning Living Entity: §6" + le.getType() +
+                " §rCause: §6" + event.getSpawnReason() +
+                " §rCancelled: §6" + status);
     }
 
-    /*@EventHandler
+    @EventHandler
     public void onAxolotlSpawnAttempt(PlayerBucketEmptyEvent event) {
-        //if(event.getAction() != Action.RIGHT_CLICK_BLOCK || event.getClickedBlock() == null) return;
-        //if(Objects.equals(event.getHand(), EquipmentSlot.OFF_HAND)) return;
+        if(event.isCancelled()) return;
+        if(!event.getBucket().equals(Material.AXOLOTL_BUCKET) &&
+                !event.getBucket().equals(Material.PUFFERFISH_BUCKET) &&
+                !event.getBucket().equals(Material.SALMON_BUCKET) &&
+                !event.getBucket().equals(Material.COD_BUCKET) &&
+                !event.getBucket().equals(Material.TROPICAL_FISH_BUCKET)) return;
         Player player = event.getPlayer();
-        //if(!player.getInventory().getItemInMainHand().getType().equals(Material.AXOLOTL_BUCKET)) return;
-        for(Entity entity : player.getWorld().getNearbyEntities(player.getLocation(), 5, 5, 5)) {
-            if(entity instanceof Axolotl) {
-                if(entity.getLocation().equals(player.getEyeLocation())) {
-                    System.out.println("Axolotl spawned!");
-                    return;
+        Location location = event.getBlock().getLocation();
+        int initial = countBucketEntities(location);
+        this.getServer().getScheduler().runTaskLater(this, () -> {
+            if(initial >= countBucketEntities(location)) {
+                PlayerInventory inv = player.getInventory();
+                inv.remove(Objects.requireNonNull(event.getItemStack()));
+                inv.addItem(new ItemStack(event.getBucket()));
+                if(location.getBlock().getType().equals(Material.WATER)) {
+                    location.getBlock().setType(Material.AIR);
                 }
-                System.out.println("EntityLoc: " + entity.getLocation());
-                System.out.println("EyeLoc: " + player.getEyeLocation());
+            }
+        }, 1);
+    }
+
+    private Integer countBucketEntities(Location loc) {
+        int i = 0;
+        for(Entity entity : loc.getWorld().getNearbyEntities(loc, 0.5, 0.5, 0.5)) {
+            if(entity instanceof Axolotl ||
+                    entity instanceof PufferFish ||
+                    entity instanceof Salmon ||
+                    entity instanceof  Cod ||
+                    entity instanceof TropicalFish) {
+                i++;
             }
         }
-        System.out.println("Axolotl not spawned! Shame!");
-    }*/
+        return i;
+    }
 
     private boolean isMobHostile(EntityType type) {
         for(EntityType t: hostileMobs) {

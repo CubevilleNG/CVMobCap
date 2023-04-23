@@ -1,6 +1,8 @@
 package org.cubeville.cvmobcap;
 
 import java.util.*;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -25,11 +27,14 @@ public class CVMobCap extends JavaPlugin implements Listener
     static final int localMobcapCount = 160;
     static final int localHostileMobcapCount = 130;
 
+    private Logger logger;
+
     static final EntityType[] hostileMobs = { EntityType.BLAZE, EntityType.CAVE_SPIDER, EntityType.CREEPER, EntityType.DROWNED, EntityType.ELDER_GUARDIAN, EntityType.ENDERMAN, EntityType.ENDERMITE, EntityType.EVOKER, EntityType.EVOKER_FANGS, EntityType.GHAST, EntityType.GUARDIAN, EntityType.HOGLIN, EntityType.HUSK, EntityType.ILLUSIONER, EntityType.MAGMA_CUBE, EntityType.PHANTOM, EntityType.PIGLIN, EntityType.PIGLIN_BRUTE, EntityType.PILLAGER, EntityType.RAVAGER, EntityType.SHULKER, EntityType.SKELETON, EntityType.SLIME, EntityType.STRAY, EntityType.SPIDER, EntityType.VEX, EntityType.VINDICATOR, EntityType.WITCH, EntityType.WITHER, EntityType.WITHER_SKELETON, EntityType.ZOGLIN, EntityType.ZOMBIE, EntityType.ZOMBIE_VILLAGER, EntityType.ZOMBIFIED_PIGLIN };
 
     public void onEnable() {
         PluginManager pm = getServer().getPluginManager();
         pm.registerEvents(this, this);
+        this.logger = this.getLogger();
     }
     
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
@@ -123,7 +128,7 @@ public class CVMobCap extends JavaPlugin implements Listener
         } else {
             status = "FALSE";
         }
-        Bukkit.getConsoleSender().sendMessage("[CVMobCap] Spawning Living Entity: §6" + le.getType() +
+        this.logger.log(Level.INFO,"[CVMobCap] Spawning Living Entity: §6" + le.getType() +
                 " §rCause: §6" + event.getSpawnReason() +
                 " §rCancelled: §6" + status);
     }
@@ -173,7 +178,7 @@ public class CVMobCap extends JavaPlugin implements Listener
         } else {
             status = "FALSE";
         }
-        Bukkit.getConsoleSender().sendMessage("[CVMobCap] Transforming Living Entity: §6" + le.getType() +
+        this.logger.log(Level.INFO,"[CVMobCap] Transforming Living Entity: §6" + le.getType() +
                 " §rCause: §6" + event.getTransformReason() +
                 " §rCancelled: §6" + status);
     }

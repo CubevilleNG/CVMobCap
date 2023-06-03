@@ -128,12 +128,12 @@ public class CVMobCap extends JavaPlugin implements Listener
         } else {
             status = "FALSE";
         }
-        this.logger.log(Level.INFO,"[CVMobCap] Spawning Living Entity: §6" + le.getType() +
+        this.logger.log(Level.CONFIG,"[CVMobCap] Spawning Living Entity: §6" + le.getType() +
                 " §rCause: §6" + event.getSpawnReason() +
                 " §rCancelled: §6" + status);
     }
 
-    @EventHandler
+    @EventHandler(priority = EventPriority.HIGHEST)
     public void onBucketEntitySpawnAttempt(PlayerBucketEmptyEvent event) {
         if(event.isCancelled()) return;
         Material mat = event.getBucket();
@@ -167,7 +167,7 @@ public class CVMobCap extends JavaPlugin implements Listener
         }, 1);
     }
 
-    @EventHandler
+    @EventHandler(priority = EventPriority.HIGHEST)
     public void onEntityTransform(EntityTransformEvent event) {
         Entity le = event.getEntity();
         String status;
@@ -178,7 +178,7 @@ public class CVMobCap extends JavaPlugin implements Listener
         } else {
             status = "FALSE";
         }
-        this.logger.log(Level.INFO,"[CVMobCap] Transforming Living Entity: §6" + le.getType() +
+        this.logger.log(Level.CONFIG,"[CVMobCap] Transforming Living Entity: §6" + le.getType() +
                 " §rCause: §6" + event.getTransformReason() +
                 " §rCancelled: §6" + status);
     }

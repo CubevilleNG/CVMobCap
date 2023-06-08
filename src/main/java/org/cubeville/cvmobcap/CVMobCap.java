@@ -1,10 +1,15 @@
 package org.cubeville.cvmobcap;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.command.Command;
@@ -23,9 +28,9 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 public class CVMobCap extends JavaPlugin implements Listener
 {
-    static final int localMobcapRadius = 128;
-    static final int localMobcapCount = 160;
-    static final int localHostileMobcapCount = 130;
+    static int localMobcapRadius;
+    static int localMobcapMax;
+    static int localMobcapHostileMax;
 
     private Logger logger;
 
@@ -35,6 +40,36 @@ public class CVMobCap extends JavaPlugin implements Listener
         PluginManager pm = getServer().getPluginManager();
         pm.registerEvents(this, this);
         this.logger = this.getLogger();
+
+        final File dataDir = getDataFolder();
+        if(!dataDir.exists()) {
+            dataDir.mkdirs();
+        }
+        File configFile = new File(dataDir, "config.yml");
+        if(!configFile.exists()) {
+            try {
+                configFile.createNewFile();
+                final InputStream inputStream = this.getResource(configFile.getName());
+                final FileOutputStream fileOutputStream = new FileOutputStream(configFile);
+                final byte[] buffer = new byte[4096];
+                int bytesRead;
+                while ((bytesRead = Objects.requireNonNull(inputStream).read(buffer)) != -1) {
+                    fileOutputStream.write(buffer, 0, bytesRead);
+                }
+                fileOutputStream.flush();
+                fileOutputStream.close();
+            } catch(IOException e) {
+                logger.log(Level.WARNING, ChatColor.LIGHT_PURPLE + "Unable to generate config file", e);
+                throw new RuntimeException(ChatColor.LIGHT_PURPLE + "Unable to generate config file", e);
+            }
+        }
+
+        localMobcapRadius = getConfig().getInt("localmobcapradius", 128);
+        localMobcapMax = getConfig().getInt("localmobcapmax", 160);
+        localMobcapHostileMax = getConfig().getInt("localmobcaphostilemax", 130);
+        logger.log(Level.INFO, "Local Mobcap Radius set to " + localMobcapRadius);
+        logger.log(Level.INFO, "Local Mobcap Max set to " + localMobcapMax);
+        logger.log(Level.INFO, "Local Mobcap Hostile Max set to " + localMobcapHostileMax);
     }
     
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
@@ -70,7 +105,7 @@ public class CVMobCap extends JavaPlugin implements Listener
                 }
             }
             sender.sendMessage("§eMobcap statistics for location of " + player.getName() + ": ");
-            sender.sendMessage("§eTotal: " + total + " (of max " + localMobcapCount + ")");
+            sender.sendMessage("§eTotal: " + total + " (of max " + localMobcapMax + ")");
             for(EntityType et: cnt.keySet()) {
                 sender.sendMessage((isMobHostile(et) ? "§c" : "§a") + et.toString() + ": " + cnt.get(et));
             }
@@ -122,7 +157,7 @@ public class CVMobCap extends JavaPlugin implements Listener
         // }
         String status;
         int cnt = countMobs(le);
-        if(cnt >= localMobcapCount || (cnt >= localHostileMobcapCount && isMobHostile(le.getType()))) {
+        if(cnt >= localMobcapMax || (cnt >= localMobcapHostileMax && isMobHostile(le.getType()))) {
             event.setCancelled(true);
             status = "TRUE";
         } else {
@@ -172,7 +207,7 @@ public class CVMobCap extends JavaPlugin implements Listener
         Entity le = event.getEntity();
         String status;
         int cnt = countMobs(le);
-        if(cnt >= localMobcapCount || (cnt >= localHostileMobcapCount && isMobHostile(le.getType()))) {
+        if(cnt >= localMobcapMax || (cnt >= localMobcapHostileMax && isMobHostile(le.getType()))) {
             event.setCancelled(true);
             status = "TRUE";
         } else {

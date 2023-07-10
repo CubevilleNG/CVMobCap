@@ -8,3 +8,6 @@ commands:
   mobcap:
     description: Counts mobs in your area
     permission: cvmobcap.query
+  mobcapall:
+    description: Debug output for all mobs on server
+    permission: cvmobcap.queryall

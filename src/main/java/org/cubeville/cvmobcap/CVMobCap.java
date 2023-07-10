@@ -8,10 +8,7 @@ import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.bukkit.Bukkit;
-import org.bukkit.ChatColor;
-import org.bukkit.Location;
-import org.bukkit.Material;
+import org.bukkit.*;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.*;
@@ -110,6 +107,19 @@ public class CVMobCap extends JavaPlugin implements Listener
                 sender.sendMessage((isMobHostile(et) ? "§c" : "§a") + et.toString() + ": " + cnt.get(et));
             }
             return true;
+        } else if(command.getName().equals("mobcapall")) {
+            int total = 0;
+            for(World world : Bukkit.getWorlds()) {
+                total = total + world.getLivingEntities().size();
+                System.out.println("Total mobs loaded on world " + world.getName() + ": " + world.getLivingEntities().size());
+                for(LivingEntity entity : world.getLivingEntities()) {
+                    Location l = entity.getLocation();
+                    if(l.getWorld() != null) {
+                        System.out.println(entity.getType() + " is located at " + l.getX() + "," + l.getY() + "," + l.getZ() + "," + l.getWorld().getName());
+                    }
+                }
+            }
+            System.out.println("Total mobs loaded on the server: " + total);
         }
 
         return false;

@@ -243,7 +243,7 @@ public class CVMobCap extends JavaPlugin implements Listener
 
     private int countBucketEntities(Location loc) {
         int i = 0;
-        for(Entity entity : loc.getWorld().getNearbyEntities(loc, 0.5, 0.5, 0.5)) {
+        for(Entity entity : loc.getWorld().getNearbyEntities(loc, 1.5, 1.5, 1.5)) {
             if(entity instanceof Axolotl ||
                     entity instanceof PufferFish ||
                     entity instanceof Salmon ||

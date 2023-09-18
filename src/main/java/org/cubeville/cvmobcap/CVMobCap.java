@@ -11,12 +11,16 @@ import java.util.logging.Logger;
 import org.bukkit.*;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
+import org.bukkit.configuration.Configuration;
+import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.*;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.CreatureSpawnEvent;
 import org.bukkit.event.entity.EntityTransformEvent;
+import org.bukkit.event.entity.SpawnerSpawnEvent;
 import org.bukkit.event.player.PlayerBucketEmptyEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
@@ -25,13 +29,22 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 public class CVMobCap extends JavaPlugin implements Listener
 {
-    static int localMobcapRadius;
-    static int localMobcapMax;
-    static int localMobcapHostileMax;
+    private int localMobcapRadius;
+    private int localpassivemax;
+    private int localhostilemax;
+    private int localspawnermax;
+
+    private Map<Location, Set<LivingEntity>> spawnerMobs = new HashMap<>();
 
     private Logger logger;
 
-    static final EntityType[] hostileMobs = { EntityType.BLAZE, EntityType.CAVE_SPIDER, EntityType.CREEPER, EntityType.DROWNED, EntityType.ELDER_GUARDIAN, EntityType.ENDERMAN, EntityType.ENDERMITE, EntityType.EVOKER, EntityType.EVOKER_FANGS, EntityType.GHAST, EntityType.GUARDIAN, EntityType.HOGLIN, EntityType.HUSK, EntityType.ILLUSIONER, EntityType.MAGMA_CUBE, EntityType.PHANTOM, EntityType.PIGLIN, EntityType.PIGLIN_BRUTE, EntityType.PILLAGER, EntityType.RAVAGER, EntityType.SHULKER, EntityType.SKELETON, EntityType.SLIME, EntityType.STRAY, EntityType.SPIDER, EntityType.VEX, EntityType.VINDICATOR, EntityType.WITCH, EntityType.WITHER, EntityType.WITHER_SKELETON, EntityType.ZOGLIN, EntityType.ZOMBIE, EntityType.ZOMBIE_VILLAGER, EntityType.ZOMBIFIED_PIGLIN };
+    private final Set<EntityType> hostileMobs = new HashSet<>(Arrays.asList(
+            EntityType.BLAZE, EntityType.CREEPER, EntityType.DROWNED, EntityType.ELDER_GUARDIAN, EntityType.ENDERMAN, EntityType.ENDERMITE,
+            EntityType.EVOKER, EntityType.EVOKER_FANGS, EntityType.GHAST, EntityType.GUARDIAN, EntityType.HOGLIN, EntityType.HUSK,
+            EntityType.ILLUSIONER, EntityType.MAGMA_CUBE, EntityType.PHANTOM, EntityType.PIGLIN_BRUTE, EntityType.PILLAGER,
+            EntityType.RAVAGER, EntityType.SHULKER, EntityType.SILVERFISH, EntityType.SKELETON, EntityType.SKELETON_HORSE,
+            EntityType.SLIME, EntityType.SPIDER, EntityType.CAVE_SPIDER, EntityType.STRAY, EntityType.VEX, EntityType.VINDICATOR, EntityType.WARDEN,
+            EntityType.WITCH, EntityType.WITHER, EntityType.WITHER_SKELETON, EntityType.ZOGLIN, EntityType.ZOMBIE, EntityType.ZOMBIE_VILLAGER));
 
     public void onEnable() {
         PluginManager pm = getServer().getPluginManager();
@@ -61,12 +74,27 @@ public class CVMobCap extends JavaPlugin implements Listener
             }
         }
 
-        localMobcapRadius = getConfig().getInt("localmobcapradius", 128);
-        localMobcapMax = getConfig().getInt("localmobcapmax", 160);
-        localMobcapHostileMax = getConfig().getInt("localmobcaphostilemax", 130);
+        loadConfig();
         logger.log(Level.INFO, "Local Mobcap Radius set to " + localMobcapRadius);
-        logger.log(Level.INFO, "Local Mobcap Max set to " + localMobcapMax);
-        logger.log(Level.INFO, "Local Mobcap Hostile Max set to " + localMobcapHostileMax);
+        logger.log(Level.INFO, "Local Passive Max set to " + localpassivemax);
+        logger.log(Level.INFO, "Local Hostile Max set to " + localhostilemax);
+        logger.log(Level.INFO, "Local Spawner Max set to " + localspawnermax);
+    }
+
+    public void loadConfig() {
+        File dataDir = getDataFolder();
+        File configFile = new File(dataDir, "config.yml");
+        YamlConfiguration config = new YamlConfiguration();
+        try {
+            config.load(configFile);
+        }
+        catch(Exception e) {
+            throw new RuntimeException("Config loading failed: " + e.getMessage());
+        }
+        localMobcapRadius = config.getInt("localmobcapradius", 128);
+        localpassivemax = config.getInt("localpassivemax", 100);
+        localhostilemax = config.getInt("localhostilemax", 100);
+        localspawnermax = config.getInt("localspawnermax", 50);
     }
     
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
@@ -86,25 +114,63 @@ public class CVMobCap extends JavaPlugin implements Listener
                     return true;
                 }
             }
-            Location loc = player.getLocation();
-            Map<EntityType, Integer> cnt = new HashMap<>();
-            int total = 0;
-            for(Entity e: player.getLocation().getWorld().getEntitiesByClass(LivingEntity.class)) {
-                if(e.getType() == EntityType.ARMOR_STAND || e.getType() == EntityType.PLAYER || e.getType() == EntityType.MARKER) continue;
-                if(e.getLocation().distance(player.getLocation()) < localMobcapRadius) {
-                    if(cnt.containsKey(e.getType())) {
-                        cnt.put(e.getType(), cnt.get(e.getType()) + 1);
-                    }
-                    else {
-                        cnt.put(e.getType(), 1);
-                    }
-                    total++;
+
+            refreshAllSpawnerEntities();
+
+            Map<EntityType, Integer> passiveMobs = new HashMap<>();
+            Map<EntityType, Integer> hostileMobs = new HashMap<>();
+            Map<EntityType, Integer> spawnerMobs = new HashMap<>();
+            int passiveTotal = 0;
+            int hostileTotal = 0;
+            int spawnerTotal = 0;
+
+            Set<LivingEntity> allSpawnerMobs = new HashSet<>();
+            for(Location spawnerLoc : this.spawnerMobs.keySet()) {
+                if(spawnerLoc.distance(player.getLocation()) < localMobcapRadius) {
+                    allSpawnerMobs.addAll(this.spawnerMobs.get(spawnerLoc));
+                    spawnerTotal = spawnerTotal + this.spawnerMobs.get(spawnerLoc).size();
                 }
             }
-            sender.sendMessage("§eMobcap statistics for location of " + player.getName() + ": ");
-            sender.sendMessage("§eTotal: " + total + " (of max " + localMobcapMax + ")");
-            for(EntityType et: cnt.keySet()) {
-                sender.sendMessage((isMobHostile(et) ? "§c" : "§a") + et.toString() + ": " + cnt.get(et));
+            for(LivingEntity le : allSpawnerMobs) {
+                if(spawnerMobs.containsKey(le.getType())) {
+                    spawnerMobs.put(le.getType(), spawnerMobs.get(le.getType()) + 1);
+                } else {
+                    spawnerMobs.put(le.getType(), 1);
+                }
+            }
+            for(LivingEntity le : player.getLocation().getWorld().getEntitiesByClass(LivingEntity.class)) {
+                if(le.getType() == EntityType.ARMOR_STAND || le.getType() == EntityType.PLAYER || le.getType() == EntityType.MARKER) continue;
+                if(allSpawnerMobs.contains(le)) continue;
+                if(le.getLocation().distance(player.getLocation()) < localMobcapRadius) {
+                    if(isMobHostile(le.getType())) {
+                        if(hostileMobs.containsKey(le.getType())) {
+                            hostileMobs.put(le.getType(), hostileMobs.get(le.getType()) + 1);
+                        } else {
+                            hostileMobs.put(le.getType(), 1);
+                        }
+                        hostileTotal++;
+                    } else {
+                        if(passiveMobs.containsKey(le.getType())) {
+                            passiveMobs.put(le.getType(), passiveMobs.get(le.getType()) + 1);
+                        } else {
+                            passiveMobs.put(le.getType(), 1);
+                        }
+                        passiveTotal++;
+                    }
+                }
+            }
+            sender.sendMessage(ChatColor.YELLOW + "Mobcap statistics for location of " + player.getName() + ": ");
+            sender.sendMessage(ChatColor.YELLOW + "Total Passive: " + passiveTotal + " (of max " + localpassivemax + ")");
+            for(EntityType et: passiveMobs.keySet()) {
+                sender.sendMessage(ChatColor.GREEN + et.toString() + ": " + passiveMobs.get(et));
+            }
+            sender.sendMessage(ChatColor.YELLOW + "Total Hostile: " + hostileTotal + " (of max " + localhostilemax + ")");
+            for(EntityType et: hostileMobs.keySet()) {
+                sender.sendMessage(ChatColor.RED + et.toString() + ": " + hostileMobs.get(et));
+            }
+            sender.sendMessage(ChatColor.YELLOW + "Total Spawner: " + spawnerTotal + " (per spawner max is set at " + localspawnermax);
+            for(EntityType et: spawnerMobs.keySet()) {
+                sender.sendMessage(ChatColor.DARK_RED + et.toString() + ": " + spawnerMobs.get(et));
             }
             return true;
         } else if(command.getName().equals("mobcapall")) {
@@ -120,6 +186,17 @@ public class CVMobCap extends JavaPlugin implements Listener
                 }
             }
             System.out.println("Total mobs loaded on the server: " + total);
+        } else if(command.getName().equals("mobcapreload")) {
+            int localMobcapRadius = this.localMobcapRadius;
+            int localpassivemax = this.localpassivemax;
+            int localhostilemax = this.localhostilemax;
+            int localspawnermax = this.localspawnermax;
+            loadConfig();
+            sender.sendMessage(ChatColor.LIGHT_PURPLE + "Config reloaded! Values: ");
+            sender.sendMessage("Mobcap Radius: " + localMobcapRadius + " -> " + this.localMobcapRadius);
+            sender.sendMessage("Passive Max: " + localpassivemax + " -> " + this.localpassivemax);
+            sender.sendMessage("Hostile Max: " + localhostilemax + " -> " + this.localhostilemax);
+            sender.sendMessage("Spawner Max: " + localspawnermax + " -> " + this.localspawnermax);
         }
 
         return false;
@@ -128,46 +205,14 @@ public class CVMobCap extends JavaPlugin implements Listener
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onEntitySpawn(CreatureSpawnEvent event) {
         if(event.isCancelled()) return;
-        
+        if(event.getSpawnReason().equals(CreatureSpawnEvent.SpawnReason.SPAWNER)) return;
         LivingEntity le = event.getEntity();
-        
         if(le.getType() == EntityType.PLAYER || le.getType() == EntityType.ARMOR_STAND || le.getType() == EntityType.MARKER) return;
-        
-        // if(event.getEntity() instanceof Squid) {
-        //     int squidCount = 0;
-        //     for(Squid s: event.getEntity().getLocation().getWorld().getEntitiesByClass(Squid.class)) {
-        //         if(s.getLocation().distance(le.getLocation()) < localMobcapRadius) squidCount++;
-        //     }
-        //     if(squidCount > 12) {
-        //         event.setCancelled(true);
-        //         return;
-        //     }
-        // }
-        
-        // if(event.getEntity() instanceof Dolphin) {
-        //     int dolphinCount = 0;
-        //     for(Dolphin s: event.getEntity().getLocation().getWorld().getEntitiesByClass(Dolphin.class)) {
-        //         if(s.getLocation().distance(le.getLocation()) < localMobcapRadius) dolphinCount++;
-        //     }
-        //     if(dolphinCount > 12) {
-        //         event.setCancelled(true);
-        //         return;
-        //     }
-        // }
-        
-        // if(event.getEntity() instanceof Cod) {
-        //     int codCount = 0;
-        //     for(Cod s: event.getEntity().getLocation().getWorld().getEntitiesByClass(Cod.class)) {
-        //         if(s.getLocation().distance(le.getLocation()) < localMobcapRadius) codCount++;
-        //     }
-        //     if(codCount > 12) {
-        //         event.setCancelled(true);
-        //         return;
-        //     }
-        // }
+
+        boolean hostile = isMobHostile(le.getType());
         String status;
-        int cnt = countMobs(le);
-        if(cnt >= localMobcapMax || (cnt >= localMobcapHostileMax && isMobHostile(le.getType()))) {
+        int cnt = countMobs(le, hostile);
+        if((hostile && cnt >= localhostilemax) || (!hostile && cnt >= localpassivemax)) {
             event.setCancelled(true);
             status = "TRUE";
         } else {
@@ -175,6 +220,35 @@ public class CVMobCap extends JavaPlugin implements Listener
         }
         this.logger.log(Level.CONFIG,"[CVMobCap] Spawning Living Entity: §6" + le.getType() +
                 " §rCause: §6" + event.getSpawnReason() +
+                " §rCancelled: §6" + status);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onSpawnerSpawn(SpawnerSpawnEvent event) {
+        Location spawnerLoc = event.getSpawner().getLocation();
+        if(spawnerMobs.containsKey(spawnerLoc)) {
+            refreshSpawnerEntities(spawnerLoc);
+        } else {
+            spawnerMobs.put(spawnerLoc, new HashSet<>());
+        }
+        if(event.isCancelled()) return;
+        if(!(event.getEntity() instanceof LivingEntity)) return;
+        LivingEntity le = (LivingEntity) event.getEntity();
+        if(le.getType() == EntityType.PLAYER || le.getType() == EntityType.ARMOR_STAND || le.getType() == EntityType.MARKER) return;
+
+        String status;
+        int cnt = spawnerMobs.get(spawnerLoc).size();
+        if(cnt >= localspawnermax) {
+            event.setCancelled(true);
+            status = "TRUE";
+        } else {
+            Set<LivingEntity> mobs = new HashSet<>(spawnerMobs.get(spawnerLoc));
+            mobs.add(le);
+            spawnerMobs.put(spawnerLoc, mobs);
+            status = "FALSE";
+        }
+        this.logger.log(Level.CONFIG,"[CVMobCap] Spawning Living Entity: §6" + le.getType() +
+                " §rCause: §6SPAWNER" +
                 " §rCancelled: §6" + status);
     }
 
@@ -215,9 +289,10 @@ public class CVMobCap extends JavaPlugin implements Listener
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onEntityTransform(EntityTransformEvent event) {
         Entity le = event.getEntity();
+        boolean hostile = isMobHostile(le.getType());
         String status;
-        int cnt = countMobs(le);
-        if(cnt >= localMobcapMax || (cnt >= localMobcapHostileMax && isMobHostile(le.getType()))) {
+        int cnt = countMobs(le, hostile);
+        if((hostile && cnt >= localhostilemax) || (!hostile && cnt >= localpassivemax)) {
             event.setCancelled(true);
             status = "TRUE";
         } else {
@@ -228,14 +303,16 @@ public class CVMobCap extends JavaPlugin implements Listener
                 " §rCancelled: §6" + status);
     }
 
-    private int countMobs(Entity le) {
+    private int countMobs(Entity le, boolean hostile) {
         int cnt = 0;
         for(Entity e: le.getLocation().getWorld().getEntitiesByClass(LivingEntity.class)) {
             if(e.getType() != EntityType.PLAYER &&
                     e.getType() != EntityType.ARMOR_STAND &&
                     e.getType() != EntityType.MARKER &&
                     e.getLocation().distance(le.getLocation()) < localMobcapRadius) {
-                cnt++;
+                if((hostile && isMobHostile(e.getType())) || (!hostile && !isMobHostile(e.getType()))) {
+                    cnt++;
+                }
             }
         }
         return cnt;
@@ -255,11 +332,30 @@ public class CVMobCap extends JavaPlugin implements Listener
         return i;
     }
 
-    private boolean isMobHostile(EntityType type) {
-        for(EntityType t: hostileMobs) {
-            if(type == t) return true;
+    private void refreshAllSpawnerEntities() {
+        Set<Location> locs = new HashSet<>(spawnerMobs.keySet());
+        for(Location loc : locs) {
+            refreshSpawnerEntities(loc);
         }
-        return false;
+    }
+
+    private void refreshSpawnerEntities(Location loc) {
+        if(spawnerMobs.containsKey(loc)) {
+            Set<LivingEntity> newEntities = new HashSet<>();
+            for(LivingEntity le : spawnerMobs.get(loc)) {
+                for(LivingEntity realLE : loc.getWorld().getLivingEntities()) {
+                    if(le.getUniqueId().equals(realLE.getUniqueId())) {
+                        newEntities.add(le);
+                        break;
+                    }
+                }
+            }
+            spawnerMobs.put(loc, newEntities);
+        }
+    }
+
+    private boolean isMobHostile(EntityType type) {
+        return hostileMobs.contains(type);
     }
 
 }

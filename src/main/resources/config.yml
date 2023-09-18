@@ -1,3 +1,5 @@
 localmobcapradius: 128
-localmobcapmax: 160
-localmobcaphostilemax: 130
+
+localpassivemax: 100
+localhostilemax: 100
+localspawnermax: 50

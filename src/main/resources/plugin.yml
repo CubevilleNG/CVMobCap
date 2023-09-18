@@ -11,3 +11,6 @@ commands:
   mobcapall:
     description: Debug output for all mobs on server
     permission: cvmobcap.queryall
+  mobcapreload:
+    description: Reloads config
+    permission: cvmobcap.reload

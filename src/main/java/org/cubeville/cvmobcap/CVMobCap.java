@@ -126,7 +126,7 @@ public class CVMobCap extends JavaPlugin implements Listener
 
             Set<LivingEntity> allSpawnerMobs = new HashSet<>();
             for(Location spawnerLoc : this.spawnerMobs.keySet()) {
-                if(spawnerLoc.distance(player.getLocation()) < localMobcapRadius) {
+                if(spawnerLoc.getWorld().equals(player.getLocation().getWorld()) && spawnerLoc.distance(player.getLocation()) < localMobcapRadius) {
                     allSpawnerMobs.addAll(this.spawnerMobs.get(spawnerLoc));
                     spawnerTotal = spawnerTotal + this.spawnerMobs.get(spawnerLoc).size();
                 }
